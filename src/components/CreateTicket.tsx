@@ -1,350 +1,284 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { TECNICOS, type Ticket } from "../data/tickets";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import { Plus, X } from "lucide-react";
+
+import type { Ticket } from "../types/ticket";
+
+type TechnicianOption = { id: string; label: string };
+type Prioridad = "Alta" | "Media" | "Baja";
+
+const UNASSIGNED = "__unassigned__";
 
 interface CreateTicketProps {
-  onTicketCreated: (ticket: Ticket) => void;
+  // TicketsTable te pasa esto y adentro persiste en Supabase
+  onTicketCreated: (ticket: Ticket) => Promise<Ticket> | Ticket;
+
   existingTicketIds: string[];
   existingTickets: Ticket[];
+
+  technicians?: TechnicianOption[];
+  techniciansLoading?: boolean;
+  techniciansError?: string | null;
 }
 
-const PRIORIDADES = ["Alta", "Media", "Baja"] as const;
-const CATEGORIAS = [
-  "Facturación",
-  "Producto defectuoso",
-  "Consulta general",
-  "Soporte técnico",
-  "Garantía",
-  "Envío y entrega",
-  "Devolución",
-  "Información de producto",
-  "Otro"
-] as const;
+function formatNowEs(): string {
+  const now = new Date();
+  return (
+    now.toLocaleDateString("es-ES") +
+    " " +
+    now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+  );
+}
 
-export function CreateTicket({ onTicketCreated, existingTicketIds, existingTickets }: CreateTicketProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  
-  // Form data
+function nextTicketId(existingIds: string[]): string {
+  let max = 0;
+
+  for (const id of existingIds) {
+    const m = id.match(/(\d+)\s*$/);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (!Number.isNaN(n)) max = Math.max(max, n);
+  }
+
+  const next = max + 1;
+  return `TCK-${String(next).padStart(3, "0")}`;
+}
+
+export function CreateTicket({
+  onTicketCreated,
+  existingTicketIds,
+  existingTickets,
+  technicians = [],
+  techniciansLoading = false,
+  techniciansError = null,
+}: CreateTicketProps) {
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const [cliente, setCliente] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [asunto, setAsunto] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [prioridad, setPrioridad] = useState<"Alta" | "Media" | "Baja">("Media");
-  const [categoria, setCategoria] = useState("");
-  const [asignado, setAsignado] = useState<string>("Sin asignar");
 
-  const generateTicketId = () => {
-    // Extraer números de los IDs existentes y encontrar el siguiente
-    const numbers = existingTicketIds
-      .map(id => parseInt(id.replace('#', '')))
-      .filter(num => !isNaN(num))
-      .sort((a, b) => b - a);
-    
-    const nextNumber = numbers.length > 0 ? numbers[0] + 1 : 1025;
-    return `#${nextNumber}`;
-  };
+  const [prioridad, setPrioridad] = useState<Prioridad>("Media");
+  const [assignedToId, setAssignedToId] = useState<string>(UNASSIGNED);
 
-  const getAutoAssignedTechnician = (prioridad: "Alta" | "Media" | "Baja") => {
-    // Filtrar técnicos excluyendo "Sin asignar"
-    const availableTechnicians = TECNICOS.filter(tecnico => tecnico !== "Sin asignar");
-    
-    // Si no hay técnicos disponibles, mantener sin asignar
-    if (availableTechnicians.length === 0) {
-      return "Sin asignar";
-    }
-    
-    // Contar tickets por técnico
-    const ticketCounts = availableTechnicians.map(tecnico => {
-      const totalTickets = existingTickets.filter(ticket => 
-        ticket.asignado === tecnico && 
-        ticket.estado !== "Cerrado" && 
-        ticket.estado !== "Resuelto"
-      ).length;
-      
-      // Si es prioridad alta, priorizar técnicos con menos tickets de alta prioridad
-      const highPriorityTickets = existingTickets.filter(ticket =>
-        ticket.asignado === tecnico &&
-        ticket.prioridad === "Alta" &&
-        ticket.estado !== "Cerrado" &&
-        ticket.estado !== "Resuelto"
-      ).length;
-      
-      return {
-        tecnico,
-        totalTickets,
-        highPriorityTickets
-      };
-    });
+  const assignedLabel = useMemo(() => {
+    if (assignedToId === UNASSIGNED) return "Sin asignar";
+    return technicians.find((t) => t.id === assignedToId)?.label ?? "Técnico";
+  }, [assignedToId, technicians]);
 
-    // Si es un ticket de prioridad alta, primero considerar la carga de tickets de alta prioridad
-    if (prioridad === "Alta") {
-      const minHighPriorityCount = Math.min(...ticketCounts.map(t => t.highPriorityTickets));
-      const candidatesWithLeastHighPriority = ticketCounts.filter(t => t.highPriorityTickets === minHighPriorityCount);
-      
-      // Si hay empate en tickets de alta prioridad, usar carga total
-      if (candidatesWithLeastHighPriority.length > 1) {
-        const minTotalInHighPriorityCandidates = Math.min(...candidatesWithLeastHighPriority.map(t => t.totalTickets));
-        const finalCandidates = candidatesWithLeastHighPriority.filter(t => t.totalTickets === minTotalInHighPriorityCandidates);
-        
-        // Selección aleatoria entre los candidatos finales
-        const randomIndex = Math.floor(Math.random() * finalCandidates.length);
-        return finalCandidates[randomIndex].tecnico;
-      } else {
-        return candidatesWithLeastHighPriority[0].tecnico;
-      }
-    }
-    
-    // Para prioridad media y baja, usar solo la carga total
-    const minTotalCount = Math.min(...ticketCounts.map(t => t.totalTickets));
-    const candidatesWithLeastTotal = ticketCounts.filter(t => t.totalTickets === minTotalCount);
-    
-    // Selección aleatoria si hay empate
-    const randomIndex = Math.floor(Math.random() * candidatesWithLeastTotal.length);
-    return candidatesWithLeastTotal[randomIndex].tecnico;
-  };
+  const canSubmit =
+    !!cliente.trim() &&
+    !!email.trim() &&
+    !!asunto.trim() &&
+    !!descripcion.trim() &&
+    !submitting;
 
-  const resetForm = () => {
+  const reset = () => {
     setCliente("");
     setEmail("");
     setTelefono("");
     setAsunto("");
     setDescripcion("");
     setPrioridad("Media");
-    setCategoria("");
-    setAsignado("Sin asignar");
+    setAssignedToId(UNASSIGNED);
   };
 
-  const handleCancel = () => {
-    resetForm();
-    setIsOpen(false);
-  };
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+    const nowIso = new Date().toISOString(); // para DB
+    const nowLabel = formatNowEs(); // para UI/comentarios
 
-    // Simular una pequeña demora
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const id = nextTicketId(existingTicketIds);
 
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('es-ES');
-    const formattedDateTime = now.toLocaleDateString('es-ES') + ' ' + 
-                            now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    // Evitar ID duplicado por si el usuario abre 2 veces el modal, etc.
+    if (existingTickets.some((t) => t.id === id)) {
+      toast.error("Ya existe un ticket con ese ID. Probá de nuevo.");
+      return;
+    }
 
-    // Asignación automática si no se asignó específicamente
-    const finalAsignado = asignado === "Sin asignar" ? getAutoAssignedTechnician(prioridad) : asignado;
-    const wasAutoAssigned = asignado === "Sin asignar" && finalAsignado !== "Sin asignar";
-
-    const newTicket: Ticket = {
-      id: generateTicketId(),
+    const ticket: Ticket = {
+      id,
       cliente: cliente.trim(),
-      asunto: asunto.trim(),
-      estado: "Abierto",
-      prioridad,
-      asignado: finalAsignado,
-      fecha: formattedDate,
-      descripcion: descripcion.trim(),
       email: email.trim(),
       telefono: telefono.trim(),
-      fechaCreacion: formattedDateTime,
-      ultimaActualizacion: formattedDateTime,
-      categoria: categoria || "Otro",
-      comentarios: [
-        `[${formattedDateTime}] Sistema: Ticket creado por administrador (Matías Gómez)`,
-        ...(wasAutoAssigned ? [`[${formattedDateTime}] Sistema: Asignado automáticamente a ${finalAsignado} (menor carga de trabajo)`] : [])
-      ]
-    };
+      asunto: asunto.trim(),
+      descripcion: descripcion.trim(),
 
-    onTicketCreated(newTicket);
-    resetForm();
-    setIsOpen(false);
-    setIsCreating(false);
+      estado: "Abierto" as any,
+      prioridad: prioridad as any,
+
+      asignado: assignedToId === UNASSIGNED ? "Sin asignar" : assignedLabel,
+      assignedToId: assignedToId === UNASSIGNED ? null : assignedToId,
+
+      comentarios: [`[${nowLabel}] Sistema: Ticket creado`],
+
+      // Si tu columna "fecha" es timestamp, esto evita el error de formato
+      fecha: nowIso,
+      // Solo para la UI (la DB se guía por created_at/updated_at)
+      fechaCreacion: nowIso,
+      ultimaActualizacion: nowIso,
+    } as any;
+
+    try {
+      setSubmitting(true);
+
+      // ESTE ES EL AWAIT QUE TE FALTABA IDENTIFICAR
+      await onTicketCreated(ticket);
+
+      setOpen(false);
+      reset();
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo crear el ticket");
+    } finally {
+      setSubmitting(false);
+    }
   };
-
-  const isFormValid = cliente.trim() && email.trim() && asunto.trim() && descripcion.trim();
 
   return (
     <>
-      <Button 
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-      >
-        <Plus className="w-4 h-4" />
-        Crear Ticket
+      <Button onClick={() => setOpen(true)} className="rounded-xl bg-indigo-600 text-white">
+        Crear ticket
       </Button>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen: boolean) => {
+          // mientras está creando, no dejamos cerrar para evitar estados raros
+          if (submitting) return;
+          setOpen(nextOpen);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-indigo-600" />
-              Crear Nuevo Ticket
-            </DialogTitle>
+            <DialogTitle>Nuevo ticket</DialogTitle>
             <DialogDescription>
-              Complete la información para crear un ticket en nombre del cliente
+              Completá los datos para registrar un nuevo ticket de soporte.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Información del Cliente */}
-            <div className="bg-slate-50 rounded-xl p-4 space-y-4">
-              <h3 className="font-medium text-slate-900">Información del Cliente</h3>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cliente">Nombre completo *</Label>
-                  <Input
-                    id="cliente"
-                    value={cliente}
-                    onChange={(e) => setCliente(e.target.value)}
-                    placeholder="Ej: Juan Pérez"
-                    required
-                  />
-                </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                placeholder="Cliente *"
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
+                disabled={submitting}
+              />
+              <Input
+                placeholder="Email *"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={submitting}
+              />
+              <Input
+                placeholder="Teléfono"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                disabled={submitting}
+              />
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Ej: juan.perez@email.com"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="telefono">Teléfono</Label>
-                <Input
-                  id="telefono"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  placeholder="Ej: +54 9 11 1234-5678"
-                />
-              </div>
-            </div>
-
-            {/* Información del Ticket */}
-            <div className="space-y-4">
-              <h3 className="font-medium text-slate-900">Información del Ticket</h3>
-              
-              <div className="space-y-2">
-                <Label htmlFor="asunto">Asunto *</Label>
-                <Input
-                  id="asunto"
-                  value={asunto}
-                  onChange={(e) => setAsunto(e.target.value)}
-                  placeholder="Ej: Problema con el producto recibido"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="descripcion">Descripción del problema *</Label>
-                <Textarea
-                  id="descripcion"
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Describe detalladamente el problema o consulta del cliente..."
-                  className="min-h-[100px] resize-none"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="prioridad">Prioridad</Label>
-                  <Select value={prioridad} onValueChange={(value) => setPrioridad(value as "Alta" | "Media" | "Baja")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRIORIDADES.map((prioridad) => (
-                        <SelectItem key={prioridad} value={prioridad}>
-                          {prioridad}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="categoria">Categoría</Label>
-                  <Select value={categoria} onValueChange={setCategoria}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIAS.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="asignado">Asignar a</Label>
-                  <Select value={asignado} onValueChange={setAsignado}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TECNICOS.map((tecnico) => (
-                        <SelectItem key={tecnico} value={tecnico}>
-                          {tecnico === "Sin asignar" ? "Sin asignar (automático)" : tecnico}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {asignado === "Sin asignar" && (
-                    <p className="text-sm text-slate-500">
-                      Se asignará automáticamente al técnico con menor carga de trabajo
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex gap-3 justify-end pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                disabled={isCreating}
-                className="flex items-center gap-2"
+              <Select
+                value={prioridad}
+                onValueChange={(v: string) => setPrioridad(v as Prioridad)}
+                disabled={submitting}
               >
-                <X className="w-4 h-4" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Prioridad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Alta">Alta</SelectItem>
+                  <SelectItem value="Media">Media</SelectItem>
+                  <SelectItem value="Baja">Baja</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Input
+              placeholder="Asunto *"
+              value={asunto}
+              onChange={(e) => setAsunto(e.target.value)}
+              disabled={submitting}
+            />
+
+            <Textarea
+              placeholder="Descripción *"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              className="min-h-[120px]"
+              disabled={submitting}
+            />
+
+            <div className="space-y-2">
+              <div className="text-sm text-slate-600">Asignar a</div>
+
+              {techniciansLoading && (
+                <div className="text-sm text-slate-500">Cargando técnicos…</div>
+              )}
+
+              {!!techniciansError && (
+                <div className="text-sm text-red-600">
+                  No se pudieron cargar técnicos: {techniciansError}
+                </div>
+              )}
+
+              <Select
+                value={assignedToId}
+                onValueChange={(v: string) => setAssignedToId(v)}
+                disabled={submitting || techniciansLoading || !!techniciansError}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      techniciansLoading
+                        ? "Cargando…"
+                        : techniciansError
+                        ? "Error técnicos"
+                        : "Seleccionar técnico"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Sin asignar</SelectItem>
+                  {technicians.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (submitting) return;
+                  setOpen(false);
+                  reset();
+                }}
+                disabled={submitting}
+              >
                 Cancelar
               </Button>
+
               <Button
-                type="submit"
-                disabled={!isFormValid || isCreating}
-                className="flex items-center gap-2"
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="bg-indigo-600 text-white"
               >
-                <Plus className="w-4 h-4" />
-                {isCreating ? "Creando..." : "Crear Ticket"}
+                {submitting ? "Creando..." : "Crear ticket"}
               </Button>
             </div>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>

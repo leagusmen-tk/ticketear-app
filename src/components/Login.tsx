@@ -1,109 +1,153 @@
 import { useState } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Alert, AlertDescription } from "./ui/alert";
-import { Lock, Mail } from "lucide-react";
+import { supabase } from "../services/supabaseClient";
 
-interface LoginProps {
-  onLogin: () => void;
-}
+type Mode = "signin" | "signup";
 
-export function Login({ onLogin }: LoginProps) {
+export function Login() {
+  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
+  const handleSignIn = async () => {
+    setError(null);
+    setLoading(true);
 
-    // Simular una pequeña demora para la autenticación
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (email === "test@adidas.com" && password === "admin12345") {
-      onLogin();
-    } else {
-      setError("Credenciales incorrectas. Verifique su email y contraseña.");
+    setLoading(false);
+    if (error) setError(error.message);
+  };
+
+  const handleSignUp = async () => {
+    setError(null);
+
+    if (!fullName.trim()) {
+      setError("Ingresá tu nombre completo.");
+      return;
     }
-    
-    setIsLoading(false);
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName.trim() },
+      },
+    });
+
+    if (error) {
+      setLoading(false);
+      setError(error.message);
+      return;
+    }
+
+    const userId = data.user?.id;
+    if (!userId) {
+      setLoading(false);
+      setError("Usuario creado, pero no pude obtener el ID.");
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          id: userId,
+          email,
+          full_name: fullName.trim(),
+          role: "technician",
+        },
+        { onConflict: "id" }
+      );
+
+    setLoading(false);
+
+    if (profileError) {
+      console.error("profiles upsert error:", profileError);
+      setError("Usuario creado, pero no pude guardar el perfil. Revisá policies/RLS.");
+      return;
+    }
+
+    setError("Usuario creado. Ahora iniciá sesión.");
+    setMode("signin");
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">ADIDAS</h1>
-            <div className="w-12 h-1 bg-black mx-auto mt-2"></div>
-          </div>
-          <CardTitle className="text-xl">Iniciar Sesión</CardTitle>
-          <CardDescription>
-            Ingrese sus credenciales para acceder al sistema de tickets
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="test@adidas.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="flex rounded-xl overflow-hidden border border-slate-200 mb-6">
+          <button
+            type="button"
+            onClick={() => setMode("signin")}
+            className={`flex-1 py-2 text-sm font-semibold ${
+              mode === "signin" ? "bg-indigo-600 text-white" : "bg-white text-slate-700"
+            }`}
+          >
+            Iniciar sesión
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("signup")}
+            className={`flex-1 py-2 text-sm font-semibold ${
+              mode === "signup" ? "bg-indigo-600 text-white" : "bg-white text-slate-700"
+            }`}
+          >
+            Crear cuenta
+          </button>
+        </div>
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+        <h1 className="text-2xl font-semibold text-center mb-2">
+          {mode === "signin" ? "Iniciar Sesión" : "Crear Cuenta"}
+        </h1>
+        <p className="text-slate-600 text-center mb-6">
+          {mode === "signin"
+            ? "Accedé con tu usuario"
+            : "Registrate y empezá a usar el sistema"}
+        </p>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={isLoading}
-            >
-              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
-            </Button>
-          </form>
+        {mode === "signup" && (
+          <>
+            <label className="text-sm text-slate-700">Nombre completo</label>
+            <input
+              className="w-full mt-1 mb-4 rounded-xl border border-slate-300 px-3 py-2"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+            />
+          </>
+        )}
 
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>Credenciales de prueba:</strong></p>
-              <p>Email: test@adidas.com</p>
-              <p>Contraseña: admin12345</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <label className="text-sm text-slate-700">Email</label>
+        <input
+          className="w-full mt-1 mb-4 rounded-xl border border-slate-300 px-3 py-2"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+        />
+
+        <label className="text-sm text-slate-700">Contraseña</label>
+        <input
+          className="w-full mt-1 mb-4 rounded-xl border border-slate-300 px-3 py-2"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete={mode === "signin" ? "current-password" : "new-password"}
+        />
+
+        {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
+
+        <button
+          onClick={mode === "signin" ? handleSignIn : handleSignUp}
+          disabled={loading}
+          className="w-full rounded-xl bg-indigo-600 text-white py-2 font-semibold disabled:opacity-60"
+        >
+          {loading ? "Cargando..." : mode === "signin" ? "Iniciar Sesión" : "Crear cuenta"}
+        </button>
+      </div>
     </div>
   );
 }

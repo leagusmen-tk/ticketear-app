@@ -1,16 +1,18 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
 import { User, Users, FileText, TrendingUp, TrendingDown } from "lucide-react";
-import { type Ticket, TECNICOS } from "../data/tickets";
 
-const TECNICOS_ACTIVOS = TECNICOS.filter(tecnico => tecnico !== "Sin asignar");
+import type { Ticket } from "../types/ticket";
+
+type TechnicianOption = { id: string; label: string };
 
 type SortType = "alphabetical" | "tickets";
 type SortOrder = "asc" | "desc";
 
 interface TechnicianStats {
+  id: string;
   name: string;
   ticketsCount: number;
   openTickets: number;
@@ -21,71 +23,121 @@ interface TechnicianStats {
 
 interface TechniciansDashboardProps {
   tickets: Ticket[];
+  technicians: TechnicianOption[];
+  techniciansLoading?: boolean;
+  techniciansError?: string | null;
 }
 
-export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
+export function TechniciansDashboard({
+  tickets,
+  technicians,
+  techniciansLoading = false,
+  techniciansError = null,
+}: TechniciansDashboardProps) {
   const [sortType, setSortType] = useState<SortType>("tickets");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
-  // Calcular estadísticas de cada técnico
-  const technicianStats = useMemo((): TechnicianStats[] => {
-    return TECNICOS_ACTIVOS.map(tecnico => {
-      const assignedTickets = tickets.filter(ticket => ticket.asignado === tecnico);
-      
-      return {
-        name: tecnico,
-        ticketsCount: assignedTickets.length,
-        openTickets: assignedTickets.filter(t => t.estado === "Abierto").length,
-        inProgressTickets: assignedTickets.filter(t => t.estado === "En Progreso").length,
-        closedTickets: assignedTickets.filter(t => t.estado === "Cerrado" || t.estado === "Resuelto").length,
-        highPriorityTickets: assignedTickets.filter(t => t.prioridad === "Alta").length,
-      };
-    });
+  // ✅ Handlers SIN (v: Type) que rompe TS/shadcn
+  const handleSortTypeChange = (value: string) => {
+    setSortType(value as SortType);
+  };
+
+  const handleSortOrderChange = (value: string) => {
+    setSortOrder(value as SortOrder);
+  };
+
+  const unassignedTicketsCount = useMemo(() => {
+    return tickets.filter((t) => !t.assignedToId).length;
   }, [tickets]);
 
-  // Ordenar los técnicos según los filtros seleccionados
+  const technicianStats = useMemo((): TechnicianStats[] => {
+    return (technicians ?? []).map((tech) => {
+      const assignedTickets = tickets.filter((t) => t.assignedToId === tech.id);
+
+      return {
+        id: tech.id,
+        name: tech.label,
+        ticketsCount: assignedTickets.length,
+        openTickets: assignedTickets.filter((t) => t.estado === "Abierto").length,
+        inProgressTickets: assignedTickets.filter((t) => t.estado === "En Progreso").length,
+        closedTickets: assignedTickets.filter((t) => t.estado === "Cerrado" || t.estado === "Resuelto").length,
+        highPriorityTickets: assignedTickets.filter((t) => t.prioridad === "Alta").length,
+      };
+    });
+  }, [tickets, technicians]);
+
+  const totalAssignedTickets = useMemo(() => {
+    return technicianStats.reduce((sum, t) => sum + t.ticketsCount, 0);
+  }, [technicianStats]);
+
+  const averageTicketsPerTechnician = useMemo(() => {
+    if (!technicianStats.length) return 0;
+    return Math.round((totalAssignedTickets / technicianStats.length) * 10) / 10;
+  }, [technicianStats.length, totalAssignedTickets]);
+
+  const maxTickets = useMemo(() => {
+    const m = Math.max(0, ...technicianStats.map((t) => t.ticketsCount));
+    return Math.max(1, m);
+  }, [technicianStats]);
+
   const sortedTechnicians = useMemo(() => {
     const sorted = [...technicianStats].sort((a, b) => {
       if (sortType === "alphabetical") {
-        return sortOrder === "asc" 
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name);
-      } else {
-        return sortOrder === "asc"
-          ? a.ticketsCount - b.ticketsCount
-          : b.ticketsCount - a.ticketsCount;
+        return sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       }
+      return sortOrder === "asc" ? a.ticketsCount - b.ticketsCount : b.ticketsCount - a.ticketsCount;
     });
     return sorted;
   }, [technicianStats, sortType, sortOrder]);
 
-  const totalTickets = technicianStats.reduce((sum, tech) => sum + tech.ticketsCount, 0);
-  const averageTicketsPerTechnician = Math.round(totalTickets / TECNICOS_ACTIVOS.length * 10) / 10;
-
   return (
     <div className="space-y-6">
-      {/* Header con estadísticas generales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {techniciansLoading && (
+        <Card>
+          <CardContent className="py-6 text-slate-600">Cargando técnicos…</CardContent>
+        </Card>
+      )}
+
+      {!!techniciansError && (
+        <Card>
+          <CardContent className="py-6 text-red-600">
+            No se pudieron cargar los técnicos: {techniciansError}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Header stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Técnicos</CardTitle>
             <Users className="h-4 w-4 text-slate-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{TECNICOS_ACTIVOS.length}</div>
+            <div className="text-2xl font-bold">{technicianStats.length}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tickets Asignados</CardTitle>
             <FileText className="h-4 w-4 text-slate-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalTickets}</div>
+            <div className="text-2xl font-bold">{totalAssignedTickets}</div>
           </CardContent>
         </Card>
-        
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sin asignar</CardTitle>
+            <FileText className="h-4 w-4 text-slate-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{unassignedTicketsCount}</div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Promedio por Técnico</CardTitle>
@@ -97,19 +149,17 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
         </Card>
       </div>
 
-      {/* Controles de filtrado */}
+      {/* Controles */}
       <Card>
         <CardHeader>
-          <CardTitle>Filtros de Ordenamiento</CardTitle>
-          <CardDescription>
-            Organizá la lista de técnicos según tus preferencias
-          </CardDescription>
+          <CardTitle>Ordenamiento</CardTitle>
+          <CardDescription>Organizá la lista de técnicos</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">Ordenar por:</label>
-              <Select value={sortType} onValueChange={(value: SortType) => setSortType(value)}>
+              <Select value={sortType} onValueChange={handleSortTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -119,10 +169,10 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="flex-1">
               <label className="text-sm font-medium mb-2 block">Dirección:</label>
-              <Select value={sortOrder} onValueChange={(value: SortOrder) => setSortOrder(value)}>
+              <Select value={sortOrder} onValueChange={handleSortOrderChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -143,7 +193,7 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
       {/* Lista de técnicos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {sortedTechnicians.map((tech, index) => (
-          <Card key={tech.name} className="relative">
+          <Card key={tech.id} className="relative">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -157,26 +207,26 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
                     </CardDescription>
                   </div>
                 </div>
-                
-                {/* Ranking badge */}
+
                 <div className="flex items-center gap-2">
                   {sortType === "tickets" && (
                     <Badge variant="outline" className="text-xs">
                       #{index + 1}
                     </Badge>
                   )}
-                  {sortOrder === "asc" && sortType === "tickets" ? (
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                  ) : sortType === "tickets" ? (
-                    <TrendingDown className="h-4 w-4 text-red-600" />
+                  {sortType === "tickets" ? (
+                    sortOrder === "asc" ? (
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                    )
                   ) : null}
                 </div>
               </div>
             </CardHeader>
-            
+
             <CardContent>
               <div className="space-y-3">
-                {/* Estadísticas de tickets por estado */}
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-600">Abiertos:</span>
@@ -184,18 +234,21 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
                       {tech.openTickets}
                     </Badge>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-slate-600">En Progreso:</span>
                     <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
                       {tech.inProgressTickets}
                     </Badge>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-slate-600">Cerrados:</span>
                     <Badge variant="outline" className="text-xs bg-green-100 text-green-800">
                       {tech.closedTickets}
                     </Badge>
                   </div>
+
                   <div className="flex justify-between">
                     <span className="text-slate-600">Alta Prioridad:</span>
                     <Badge variant="destructive" className="text-xs">
@@ -204,13 +257,10 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
                   </div>
                 </div>
 
-                {/* Barra de progreso visual */}
                 <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: totalTickets > 0 ? `${(tech.ticketsCount / Math.max(...technicianStats.map(t => t.ticketsCount))) * 100}%` : '0%' 
-                    }}
+                    style={{ width: `${(tech.ticketsCount / maxTickets) * 100}%` }}
                   />
                 </div>
               </div>
@@ -219,12 +269,11 @@ export function TechniciansDashboard({ tickets }: TechniciansDashboardProps) {
         ))}
       </div>
 
-      {/* Mensaje si no hay técnicos con tickets */}
-      {sortedTechnicians.every(tech => tech.ticketsCount === 0) && (
+      {!techniciansLoading && !techniciansError && technicianStats.length === 0 && (
         <Card>
           <CardContent className="text-center py-8">
             <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-600">No hay tickets asignados a técnicos en este momento.</p>
+            <p className="text-slate-600">No hay técnicos para mostrar.</p>
           </CardContent>
         </Card>
       )}
