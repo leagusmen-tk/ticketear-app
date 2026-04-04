@@ -1,110 +1,128 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-Deno.serve(async (req) => {
+serve(async (req) => {
+  // Manejo de CORS para que tu frontend de React pueda comunicarse sin problemas
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 200 })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Solo peticiones POST' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 405
-      })
-    }
+    // Usamos el SERVICE_ROLE_KEY porque esta función actúa como "Dios" en tu base de datos,
+    // necesita poder leer todos los tickets y perfiles para hacer el cálculo matemático.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
+    // 1. Recibimos los datos (Puede venir de React o de Make.com)
     const body = await req.json()
-    const { cliente, email, telefono, asunto, descripcion, categoria } = body
+    const { cliente, email, telefono, asunto, descripcion, categoria, assignedToId, user_id } = body
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // 2. Generamos la ÚNICA FUENTE DE VERDAD para el ID
+    const idUnico = `TCK-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
 
-    const idUnico = `TCK-${crypto.randomUUID().split('-')[0].toUpperCase()}`
+    // Variables para definir el ganador
+    let idTecnicoFinal = assignedToId || null;
+    let nombreTecnicoFinal = null;
+
+    // ==========================================
+    // 3. LÓGICA DE BALANCEO DE CARGA
+    // ==========================================
+    if (!idTecnicoFinal) {
+      // Si entra acá, significa que el Admin eligió "Sin asignar" o el ticket entró automático por email.
+      // Buscamos si la palanca maestra de auto-asignación está encendida
+      const { data: flag } = await supabaseAdmin
+        .from('feature_flags')
+        .select('is_enabled')
+        .eq('name', 'balanceo_automatico')
+        .single();
+
+      if (flag?.is_enabled) {
+        // A. Traemos TODOS los perfiles que sean técnicos
+        const { data: tecnicos } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name')
+          .eq('role', 'technician');
+
+        if (tecnicos && tecnicos.length > 0) {
+          // B. Traemos la columna de asignación de los tickets ACTIVOS
+          const { data: ticketsActivos } = await supabaseAdmin
+            .from('tickets')
+            .select('assigned_to_id')
+            .in('estado', ['Abierto', 'En Progreso']);
+
+          // C. Buscamos al técnico con el menor número de carga
+          let minimoTickets = Infinity;
+          let idGanador = null;
+          let nombreGanador = null;
+
+          for (const tecnico of tecnicos) {
+            const cargaActual = ticketsActivos?.filter(t => t.assigned_to_id === tecnico.id).length || 0;
+            
+            if (cargaActual < minimoTickets) {
+              minimoTickets = cargaActual;
+              idGanador = tecnico.id;
+              nombreGanador = tecnico.full_name;
+            }
+          }
+
+          // Asignamos el premio
+          idTecnicoFinal = idGanador;
+          nombreTecnicoFinal = nombreGanador;
+        }
+      }
+    } else {
+      // Si el Admin YA HABÍA elegido a alguien a dedo, solo buscamos su nombre para el label visual
+      const { data: tec } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', idTecnicoFinal)
+        .single();
+      
+      if (tec) nombreTecnicoFinal = tec.full_name;
+    }
 
     const nuevoTicket = {
       id: idUnico,
+      user_id: user_id || null, 
       cliente: cliente || 'Cliente Anónimo',
       email: email || '',
-      telefono: telefono || '',
+      telefono: telefono || null,
       asunto: asunto || 'Sin asunto',
       descripcion: descripcion || '',
       categoria: categoria || 'General',
       estado: 'Abierto',
-      prioridad: 'Media',
+      prioridad: 'Media', 
+      assigned_to_id: idTecnicoFinal,
+      asignado: nombreTecnicoFinal || 'Sin asignar',
       fecha: new Date().toISOString()
-    }
+    };
 
-    // 1. Guardamos el ticket en la base de datos
-    const { data, error } = await supabase
+    const { data: ticketCreado, error: insertError } = await supabaseAdmin
       .from('tickets')
       .insert(nuevoTicket)
-      .select()
-      .single()
+      .select('*')
+      .single();
 
-    if (error) throw error
+    if (insertError) throw insertError;
 
-    // ==========================================
-    // 2. NUEVO: ¡Disparamos el mail con Resend!
-    // ==========================================
-    const resendKey = Deno.env.get('RESEND_API_KEY')
-    
-    if (resendKey) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${resendKey}`
-          },
-          body: JSON.stringify({
-            from: 'Ticketear <onboarding@resend.dev>', 
-            to: ['leagusmen@gmail.com'],     
-            subject: `Nuevo Ticket: ${asunto} [${idUnico}]`,
-            html: `
-              <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2 style="color: #4F46E5;">¡Nuevo ticket registrado!</h2>
-                <p>Ha ingresado un nuevo ticket al sistema desde el formulario web.</p>
-                <div style="background-color: #f4f4f5; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                  <p><strong>ID:</strong> ${idUnico}</p>
-                  <p><strong>Cliente:</strong> ${cliente || 'Anónimo'}</p>
-                  <p><strong>Email de contacto:</strong> ${email}</p>
-                  <p><strong>Asunto:</strong> ${asunto}</p>
-                  <p><strong>Descripción:</strong></p>
-                  <p style="white-space: pre-wrap;">${descripcion}</p>
-                </div>
-                <br>
-                <p><small style="color: #6b7280;">Este es un correo automático de prueba generado por Ticketear.</small></p>
-              </div>
-            `
-          })
-        })
-      } catch (emailError) {
-        // Atrapamos el error del mail pero NO cortamos la función, 
-        // así el ticket se crea igual aunque falle el envío del correo.
-        console.error("No se pudo enviar el correo:", emailError)
-      }
-    }
-
-    // 3. Devolvemos el éxito al frontend
-    return new Response(JSON.stringify({ mensaje: 'Ticket creado con éxito', ticket: data }), {
+    // Le devolvemos el ticket ya armado y con ID oficial al frontend
+    return new Response(JSON.stringify(ticketCreado), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 201
+      status: 200,
     })
 
   } catch (error: any) {
-    console.error("Error capturado:", error)
-    return new Response(JSON.stringify({ 
-      error: 'Error al procesar la solicitud', 
-      detalles: error.message || error 
-    }), {
+    console.error("Error en Edge Function:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400
+      status: 400,
     })
   }
 })

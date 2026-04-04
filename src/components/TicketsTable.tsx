@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
-import { Calendar, User, MessageSquare, Send, X, Loader2 } from "lucide-react";
+import { Calendar, User, MessageSquare, Send, X, Loader2, Bot } from "lucide-react";
+
 
 import { CreateTicket } from "./CreateTicket";
 import type { Ticket, Estado } from "../types/ticket";
@@ -43,6 +44,19 @@ function formatNowEs(): string {
     " " +
     now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
   );
+}
+
+function formatDisplayDate(isoString: string | null | undefined): string {
+  if (!isoString) return "-";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString; // Si por algo falla, devuelve el original
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 export function TicketsTable({
@@ -403,10 +417,10 @@ const handleReassign = () => {
 };
 
 
-  // Crear ticket (persistido)
+// Crear ticket (persistido)
   const handleTicketCreated = async (newTicket: Ticket) => {
     try {
-      const created = await createTicket(newTicket);
+      const created = await createTicket(newTicket); 
       toast.success(`Ticket ${created.id} creado`);
       return created;
     } catch (e: any) {
@@ -596,90 +610,111 @@ const handleReassign = () => {
         </div>
       </section>
 
-      {/* Modal */}
+{/* Modal */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[1000px] w-[95vw] max-h-[90vh] overflow-y-auto bg-slate-50 p-4 sm:p-8 border-slate-200 shadow-2xl rounded-2xl">
           {selectedTicket && (
             <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <span className="text-indigo-600">{selectedTicket.id}</span>
-                  <span className="text-slate-600">-</span>
-                  <span>{selectedTicket.asunto}</span>
+              <DialogHeader className="mb-2">
+                <DialogTitle className="flex items-center gap-3 text-xl sm:text-2xl">
+                  <span className="text-indigo-600 font-bold bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200">
+                    {selectedTicket.id}
+                  </span>
+                  <span className="text-slate-800 font-semibold">{selectedTicket.asunto}</span>
                 </DialogTitle>
-                <DialogDescription>Detalles completos del ticket de soporte</DialogDescription>
+                <DialogDescription className="text-slate-500 mt-2 text-base">
+                  Detalles operativos del ticket
+                </DialogDescription>
               </DialogHeader>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+                
+                {/* COLUMNA PRINCIPAL (Izquierda) */}
                 <div className="lg:col-span-2 space-y-6">
-                  <div className="bg-slate-50 rounded-xl p-6">
-                    <h3 className="flex items-center gap-2 mb-4">
-                      <User className="w-5 h-5 text-slate-600" />
+                  
+                  {/* Tarjeta: Info del Cliente */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="flex items-center gap-2 mb-6 text-base font-bold text-slate-800">
+                      <User className="w-5 h-5 text-indigo-500" />
                       Información del Cliente
                     </h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-slate-600">Nombre:</label>
-                        <p>{selectedTicket.cliente}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nombre</label>
+                        <p className="text-slate-900 font-medium">{selectedTicket.cliente}</p>
                       </div>
-                      <div>
-                        <label className="text-slate-600">Email:</label>
-                        <p className="text-indigo-600">{selectedTicket.email}</p>
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Email</label>
+                        <p>
+                          {selectedTicket.email ? (
+                            <a href={`mailto:${selectedTicket.email}`} className="text-indigo-600 font-medium hover:text-indigo-800 hover:underline break-all">
+                              {selectedTicket.email}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic">No provisto</span>
+                          )}
+                        </p>
                       </div>
-                      <div>
-                        <label className="text-slate-600">Teléfono:</label>
-                        <p>{selectedTicket.telefono}</p>
+                      <div className="sm:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Teléfono</label>
+                        <p className="text-slate-900 font-medium">{selectedTicket.telefono || <span className="text-slate-400 italic">No provisto</span>}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-white border rounded-xl p-6">
-                    <h3 className="flex items-center gap-2 mb-4">
-                      <MessageSquare className="w-5 h-5 text-slate-600" />
+                  {/* Tarjeta: Descripción */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="flex items-center gap-2 mb-4 text-base font-bold text-slate-800">
+                      <MessageSquare className="w-5 h-5 text-indigo-500" />
                       Descripción del Problema
                     </h3>
-                    <p className="text-slate-700 leading-relaxed">{selectedTicket.descripcion}</p>
+                    <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 shadow-sm">
+                      <p className="text-slate-800 text-[15px] leading-relaxed whitespace-pre-wrap">
+                        {selectedTicket.descripcion}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="bg-white border rounded-xl p-6">
-                    <h3 className="mb-4">Historial de Comentarios</h3>
-                    <div className="space-y-3 mb-4">
-                      {selectedTicket.comentarios.map((comentario, index) => (
-                        <div key={index} className="flex gap-3 p-3 bg-slate-50 rounded-lg">
-                          <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 flex-shrink-0" />
-                          <p className="text-slate-700">{comentario}</p>
+                  {/* Tarjeta: Comentarios */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="text-base font-bold text-slate-800 mb-5">Historial de Comentarios</h3>
+                    <div className="space-y-4 mb-6">
+                      {selectedTicket.comentarios.length === 0 ? (
+                        <div className="text-center py-6 bg-slate-50 rounded-xl border border-slate-100 shadow-sm">
+                          <p className="text-sm text-slate-500 italic">No hay comentarios aún en este ticket.</p>
                         </div>
-                      ))}
+                      ) : (
+                        selectedTicket.comentarios.map((comentario, index) => (
+                          <div key={index} className="flex gap-4">
+                            <div className="mt-2">
+                              <div className="w-3 h-3 rounded-full bg-indigo-500 ring-4 ring-indigo-50" />
+                            </div>
+                            <div className="flex-1 bg-slate-50 rounded-xl p-4 border border-slate-100 shadow-sm">
+                              <p className="text-[14px] text-slate-800 whitespace-pre-wrap leading-relaxed">{comentario}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
 
+                    {/* Caja de respuesta */}
                     {isReplying && (
-                      <div className="border-t pt-4 space-y-3">
-                        <label className="text-slate-600 mb-2 block">Nueva respuesta:</label>
+                      <div className="border-t border-slate-100 pt-5 mt-2 animate-in fade-in slide-in-from-top-2">
+                        <label className="text-sm font-bold text-slate-700 mb-2 block">Escribir respuesta:</label>
                         <Textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Escribe tu respuesta aquí..."
-                          className="min-h-[100px] resize-none"
+                          placeholder="Ingresá los detalles de la resolución o el mensaje para el cliente..."
+                          className="min-h-[120px] resize-none focus:ring-2 focus:ring-indigo-500 rounded-xl bg-white border-slate-200 text-slate-800"
                           disabled={savingReply}
                         />
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelReply}
-                            className="flex items-center gap-2"
-                            disabled={savingReply}
-                          >
-                            <X className="w-4 h-4" />
-                            Cancelar
+                        <div className="flex gap-3 justify-end mt-4">
+                          <Button variant="outline" onClick={handleCancelReply} disabled={savingReply} className="px-5">
+                            <X className="w-4 h-4 mr-2" /> Cancelar
                           </Button>
-                          <Button
-                            onClick={handleSendReply}
-                            disabled={!replyText.trim() || savingReply}
-                            className="flex items-center gap-2"
-                          >
-                            {savingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                            {savingReply ? "Enviando..." : "Enviar"}
+                          <Button onClick={handleSendReply} disabled={!replyText.trim() || savingReply} className="bg-indigo-600 hover:bg-indigo-700 text-white border-0 px-6">
+                            {savingReply ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                            {savingReply ? "Guardando..." : "Enviar Respuesta"}
                           </Button>
                         </div>
                       </div>
@@ -687,120 +722,81 @@ const handleReassign = () => {
                   </div>
                 </div>
 
-                {/* Sidebar */}
+                {/* BARRA LATERAL (Derecha) */}
                 <div className="space-y-6">
-                  <div className="bg-white border rounded-xl p-6">
-                    <h3 className="mb-4">Estado del Ticket</h3>
-
-                    <label className="text-slate-600 block mb-1">Estado:</label>
-                    {isChangingState ? (
-                      <div className="space-y-3">
-                        <Select
-                          value={newEstado ?? ""}
-                          onValueChange={(v: string) => setNewEstado(v as Estado)}
-                          disabled={savingState}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Seleccionar estado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ESTADOS.map((estado) => (
-                              <SelectItem key={estado} value={estado}>
-                                {ESTADO_LABELS[estado]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={handleConfirmStateChange}
-                            disabled={!newEstado || newEstado === selectedTicket.estado || savingState}
-                            className="flex-1"
-                          >
-                            {savingState ? "Guardando..." : "Confirmar"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCancelStateChange}
-                            className="flex-1"
-                            disabled={savingState}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
+                  
+                  {/* Tarjeta: Estado y Prioridad */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="text-base font-bold text-slate-800 mb-5">Estado & Prioridad</h3>
+                    
+                    <div className="space-y-5">
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Estado Actual</label>
+                        {isChangingState ? (
+                          <div className="space-y-3 mt-2">
+                            <Select value={newEstado ?? ""} onValueChange={(v: string) => setNewEstado(v as Estado)} disabled={savingState}>
+                              <SelectTrigger className="w-full rounded-lg bg-white border-slate-200"><SelectValue placeholder="Estado" /></SelectTrigger>
+                              <SelectContent>
+                                {ESTADOS.map((e) => <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={handleConfirmStateChange} disabled={!newEstado || newEstado === selectedTicket.estado || savingState} className="flex-1 bg-indigo-600 text-white border-0 hover:bg-indigo-700">
+                                Confirmar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={handleCancelStateChange} disabled={savingState} className="flex-1">
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-1">{getEstadoBadge(selectedTicket.estado)}</div>
+                        )}
                       </div>
-                    ) : (
-                      getEstadoBadge(selectedTicket.estado)
-                    )}
 
-                    <div className="mt-4">
-                      <label className="text-slate-600 block mb-1">Prioridad:</label>
-                      {getPrioridadBadge(selectedTicket.prioridad)}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Nivel de Prioridad</label>
+                        <div className="mt-1">{getPrioridadBadge(selectedTicket.prioridad)}</div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-white border rounded-xl p-6">
-                    <h3 className="flex items-center gap-2 mb-4">
-                      <User className="w-5 h-5 text-slate-600" />
-                      Asignación
-                    </h3>
-
-                    <label className="text-slate-600 block mb-1">Asignado a:</label>
+                  {/* Tarjeta: Asignación */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="text-base font-bold text-slate-800 mb-4">Asignación</h3>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">Técnico Responsable</label>
+                    
                     {!isReassigning ? (
-                      <p className={selectedTicket.assignedToId ? "text-slate-900" : "text-slate-400"}>
-                        {selectedTicket.assignedToId
-                          ? technicians.find((t) => t.id === selectedTicket.assignedToId)?.label ??
-                            selectedTicket.asignado ??
-                            "Técnico"
-                          : "Sin asignar"}
-                      </p>
+                      <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg shadow-sm shrink-0">
+                          {selectedTicket.assignedToId ? 
+                            (technicians.find((t) => t.id === selectedTicket.assignedToId)?.label.charAt(0) ?? "T") 
+                            : "?"}
+                        </div>
+                        <p className={`font-semibold text-[15px] ${selectedTicket.assignedToId ? "text-slate-900" : "text-slate-500 italic"}`}>
+                          {selectedTicket.assignedToId
+                            ? technicians.find((t) => t.id === selectedTicket.assignedToId)?.label ?? selectedTicket.asignado ?? "Técnico"
+                            : "Ticket sin asignar"}
+                        </p>
+                      </div>
                     ) : (
-                      <div className="space-y-3">
-                        <Select
-                          value={newAssignedTo}
-                          onValueChange={setNewAssignedTo}
-                          disabled={techniciansLoading || !!techniciansError || savingReassign}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue
-                              placeholder={
-                                techniciansLoading
-                                  ? "Cargando…"
-                                  : techniciansError
-                                  ? "Error técnicos"
-                                  : "Seleccionar técnico"
-                              }
-                            />
+                      <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <Select value={newAssignedTo} onValueChange={setNewAssignedTo} disabled={techniciansLoading || !!techniciansError || savingReassign}>
+                          <SelectTrigger className="w-full rounded-lg bg-white border-slate-200">
+                            <SelectValue placeholder={techniciansLoading ? "Cargando…" : "Elegir técnico..."} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={UNASSIGNED}>Sin asignar</SelectItem>
                             {(technicians ?? []).map((t) => (
-                              <SelectItem key={t.id} value={t.id}>
-                                {t.label}
-                              </SelectItem>
+                              <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={handleConfirmReassign}
-                            disabled={!newAssignedTo || savingReassign}
-                          >
-                            {savingReassign ? "Guardando..." : "Confirmar"}
+                          <Button size="sm" onClick={handleConfirmReassign} disabled={!newAssignedTo || savingReassign} className="flex-1 bg-indigo-600 text-white border-0 hover:bg-indigo-700">
+                            Confirmar
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={handleCancelReassign}
-                            disabled={savingReassign}
-                          >
+                          <Button size="sm" variant="outline" onClick={handleCancelReassign} disabled={savingReassign} className="flex-1">
                             Cancelar
                           </Button>
                         </div>
@@ -808,116 +804,66 @@ const handleReassign = () => {
                     )}
                   </div>
 
-                  <div className="bg-white border rounded-xl p-6">
-                    <h3 className="flex items-center gap-2 mb-4">
-                      <Calendar className="w-5 h-5 text-slate-600" />
-                      Fechas
+                  {/* Tarjeta: Fechas */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="flex items-center gap-2 text-base font-bold text-slate-800 mb-5">
+                      <Calendar className="w-5 h-5 text-indigo-500" /> Registro de Tiempos
                     </h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-slate-600 block mb-1">Creado:</label>
-                        <p className="text-sm">{selectedTicket.fechaCreacion}</p>
+                    <div className="space-y-4">
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Creado</label>
+                        <p className="text-sm font-semibold text-slate-900">{formatDisplayDate(selectedTicket.fechaCreacion)}</p>
                       </div>
-                      <div>
-                        <label className="text-slate-600 block mb-1">Última actualización:</label>
-                        <p className="text-sm">{selectedTicket.ultimaActualizacion}</p>
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm flex flex-col gap-1">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Actualizado</label>
+                        <p className="text-sm font-semibold text-slate-900">{formatDisplayDate(selectedTicket.ultimaActualizacion)}</p>
                       </div>
                     </div>
                   </div>
 
-                 <div className="bg-white border rounded-xl p-6">
-  <h3 className="mb-4">Acciones</h3>
+                  {/* Tarjeta: Panel de Acciones Rapidas */}
+                  <div className="bg-slate-900 rounded-2xl shadow-lg p-6 text-white border border-slate-800">
+                    <h3 className="text-base font-bold mb-4 text-white flex items-center gap-2">
+                      <Bot className="w-5 h-5 text-indigo-400" />
+                      Acciones Rápidas
+                    </h3>
+                    
+                    {!isAdmin && selectedTicket && !isAssignedToMeSelected && (
+                      <div className="text-xs text-slate-300 mb-5 bg-slate-800 p-3 rounded-xl border border-slate-700">
+                        {isUnassignedSelected
+                          ? "Este ticket está libre. Podés autoasignártelo para empezar a trabajarlo."
+                          : "Solo el técnico asignado puede responder o cambiar el estado."}
+                      </div>
+                    )}
 
-  {/* Mensajes guía (vendible) */}
-  {!isAdmin && selectedTicket && !isAssignedToMeSelected && (
-    <div className="text-xs text-slate-500 mb-3">
-      {isUnassignedSelected
-        ? "Este ticket está sin asignar. Podés autoasignártelo para trabajarlo."
-        : "Solo el técnico asignado puede responder o cambiar el estado."}
-    </div>
-  )}
+                    {isAdmin && (
+                      <div className="text-[13px] text-slate-300 mb-5 bg-slate-800 p-3.5 rounded-xl border border-slate-700 leading-relaxed">
+                        Como administrador gestionás la asignación de carga de trabajo, pero no podés responder tickets directamente.
+                      </div>
+                    )}
 
-  {isAdmin && (
-    <div className="text-xs text-slate-500 mb-3">
-      El administrador gestiona la asignación. No responde ni cambia estados.
-    </div>
-  )}
+                    <div className="space-y-3">
+                      {!isAdmin && (
+                        <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 font-semibold h-11" onClick={handleAutoAssign} disabled={!canTechAutoAssignSelected || savingAutoAssign}>
+                          {savingAutoAssign ? "Asignando..." : "Autoasignarme este ticket"}
+                        </Button>
+                      )}
 
-  <div className="space-y-2">
-    {/* Técnico: autoasignación solo si está sin asignar */}
-    {!isAdmin && (
-      <Button
-        className="w-full"
-        onClick={handleAutoAssign}
-        disabled={
-          !canTechAutoAssignSelected ||
-          savingAutoAssign ||
-          techniciansLoading ||
-          !!techniciansError
-        }
-        title={
-          !selectedTicket
-            ? "Seleccioná un ticket"
-            : !isUnassignedSelected
-            ? "Solo disponible si el ticket está sin asignar"
-            : undefined
-        }
-      >
-        {savingAutoAssign ? "Asignando..." : "Autoasignarme"}
-      </Button>
-    )}
+                      <Button className="w-full bg-indigo-600 hover:bg-indigo-500 border-0 text-white font-semibold h-11 transition-colors" onClick={handleReply} disabled={isAdmin || !canTechWorkSelected}>
+                        Responder al Cliente
+                      </Button>
 
-    {/* Técnico: trabajar ticket SOLO si está asignado a él */}
-    <Button
-      className="w-full"
-      variant={isReplying ? "outline" : "default"}
-      onClick={handleReply}
-      disabled={isAdmin || !canTechWorkSelected}
-      title={
-        isAdmin
-          ? "El administrador no responde tickets"
-          : !canTechWorkSelected
-          ? isUnassignedSelected
-            ? "Autoasignate el ticket para poder responder"
-            : "Solo el técnico asignado puede responder"
-          : undefined
-      }
-    >
-      {isReplying ? "Respondiendo..." : "Responder"}
-    </Button>
+                      <Button className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold h-11 transition-colors" onClick={handleChangeState} disabled={isAdmin || !canTechWorkSelected}>
+                        Cambiar Estado
+                      </Button>
 
-    <Button
-      className="w-full"
-      variant="outline"
-      onClick={handleChangeState}
-      disabled={isAdmin || !canTechWorkSelected}
-      title={
-        isAdmin
-          ? "El administrador no cambia estados"
-          : !canTechWorkSelected
-          ? isUnassignedSelected
-            ? "Autoasignate el ticket para poder cambiar el estado"
-            : "Solo el técnico asignado puede cambiar el estado"
-          : undefined
-      }
-    >
-      {isChangingState ? "Cambiando..." : "Cambiar Estado"}
-    </Button>
-
-    {/* Admin: reasignar */}
-    {isAdmin && (
-      <Button
-        className="w-full"
-        variant="outline"
-        onClick={handleReassign}
-        disabled={!canAdminReassignSelected || techniciansLoading || !!techniciansError}
-        title={techniciansLoading ? "Cargando técnicos…" : techniciansError ? "Error cargando técnicos" : undefined}
-      >
-        {isReassigning ? "Reasignando..." : "Reasignar"}
-      </Button>
-    )}
-  </div>
-</div>
+                      {isAdmin && (
+                        <Button className="w-full bg-white text-slate-900 hover:bg-slate-200 font-semibold h-11 mt-2" onClick={handleReassign} disabled={!canAdminReassignSelected}>
+                          {isReassigning ? "Cargando..." : "Reasignar Técnico"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
                 </div>
               </div>

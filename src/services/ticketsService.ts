@@ -83,7 +83,32 @@ async function replaceAll(tickets: Ticket[]): Promise<void> {
   if (error) throw error;
 }
 
+// NUEVA FUNCIÓN: Llama a la Edge Function centralizada
+async function create(ticketData: Partial<Ticket>): Promise<Ticket> {
+  // Usamos .invoke() en lugar de .insert()
+  const { data, error } = await supabase.functions.invoke('crear-ticket', {
+    body: {
+      cliente: ticketData.cliente,
+      email: ticketData.email,
+      telefono: ticketData.telefono,
+      asunto: ticketData.asunto,
+      descripcion: ticketData.descripcion,
+      categoria: ticketData.categoria || 'General',
+      // Si el admin no eligió a nadie, esto viaja como null y dispara el balanceo
+      assignedToId: ticketData.assignedToId || null, 
+    }
+  });
+
+  if (error) {
+    console.error("Error en Edge Function:", error);
+    throw new Error(error.message || "Error al crear el ticket en el servidor");
+  }
+
+  return toTicket(data as TicketRow);
+}
+
 export const ticketsService = {
   list,
   replaceAll,
+  create, 
 };

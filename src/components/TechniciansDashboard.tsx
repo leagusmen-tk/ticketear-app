@@ -199,11 +199,9 @@ export function TechniciansDashboard({
           </Card>
         </div>
       </div>
-      {/* ===== FIN SECCIÓN MEDIA REMODELADA ===== */}
 
       {/* Lista de técnicos */}
 
-      {/* Lista de técnicos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {sortedTechnicians.map((tech, index) => (
           <Card key={tech.id} className="relative">

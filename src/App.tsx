@@ -7,6 +7,7 @@ import { Login } from "./components/Login";
 import { Header } from "./components/Header";
 import { ProfileDialog } from "./components/ProfileDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { AutoAssignToggle } from "../AutoAssignToggle"; 
 
 import { supabase } from "./services/supabaseClient";
 import { useTickets } from "./services/useTickets";
@@ -134,6 +135,17 @@ export default function App() {
   <TabsContent value="tickets" className="space-y-6">
     <p className="text-slate-600">Gestioná y buscá tickets de soporte</p>
 
+<div className="max-w-7xl mx-auto p-4 space-y-6">
+  
+  {/* Sección de Administración y Configuración */}
+  {isAdmin && (
+    <section className="mb-8">
+      <h2 className="text-lg font-bold text-slate-800 mb-3">Configuración del Sistema</h2>
+      <AutoAssignToggle isAdmin={isAdmin} />
+    </section>
+  )}
+
+
     <TicketsTable
       tickets={ticketsState ?? []}
       setTickets={setTickets}
@@ -147,6 +159,7 @@ export default function App() {
       appendComment={appendComment}
       createTicket={createTicket}
     />
+    </div>
   </TabsContent>
 
   {isAdmin && (
@@ -159,6 +172,7 @@ export default function App() {
         techniciansLoading={techniciansLoading}
         techniciansError={techniciansError}
       />
+      
     </TabsContent>
   )}
 </Tabs>

@@ -224,21 +224,33 @@ const createTicket = useCallback(async (ticket: Ticket) => {
 
   if (!userId) throw new Error("No hay usuario autenticado");
 
-  const dbInsert = {
-    ...ticketToDbInsert(ticket),
-    user_id: userId,
-  };
+  // 1. Llamamos al "Cerebro" (Edge Function) en lugar del insert directo
+  const { data, error } = await supabase.functions.invoke('crear-ticket', {
+    body: {
+      cliente: ticket.cliente,
+      email: ticket.email,
+      telefono: ticket.telefono,
+      asunto: ticket.asunto,
+      descripcion: ticket.descripcion,
+      categoria: ticket.categoria || 'General',
+      // Mandamos el asignado (si el admin eligió a alguien) o null para activar balanceo
+      assignedToId: (ticket as any).assignedToId ?? null, 
+      // CRÍTICO: Le pasamos el ID de quien lo está creando para que no falle el RLS
+      user_id: userId 
+    }
+  });
 
-  const { data, error } = await supabase
-    .from("tickets")
-    .insert(dbInsert as any)
-    .select("*")
-    .single();
+  if (error) {
+    console.error("Error de la Edge Function:", error);
+    throw new Error(error.message || "Error al crear el ticket desde el servidor");
+  }
 
-  if (error) throw new Error(error.message);
-
+  // 2. La Edge Function nos devuelve el ticket listo. Lo pasamos por tu mapeador.
   const created = dbToTicket(data as TicketDb);
+  
+  // 3. Actualizamos el estado de React para que aparezca al instante en la tabla
   setTickets((prev) => [created, ...prev]);
+  
   return created;
 }, []);
 
