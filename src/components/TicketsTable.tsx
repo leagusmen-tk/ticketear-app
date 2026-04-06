@@ -187,7 +187,7 @@ const canAdminReassignSelected = isAdmin && !!selectedTicket;
     setReplyText("");
   };
 
-  // Responder (persistido)
+ // Responder (persistido)
   const handleSendReply = async () => {
     if (!selectedTicket || !replyText.trim() || savingReply) return;
 
@@ -197,6 +197,23 @@ const canAdminReassignSelected = isAdmin && !!selectedTicket;
     try {
       setSavingReply(true);
       await appendComment(selectedTicket.id, newComment);
+
+      const makeWebhookUrl = "https://hook.us2.make.com/lnj6xbsoyrnittbr3tvwghauasi77rqf"; 
+      
+      if (selectedTicket.email) {
+        await fetch(makeWebhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ticketId: selectedTicket.id,
+            cliente: selectedTicket.cliente,
+            emailDestino: selectedTicket.email,
+            asunto: selectedTicket.asunto,
+            respuesta: replyText.trim(),
+            tecnico: currentUserName || "Soporte" 
+          }),
+        }).catch(err => console.error("Error enviando webhook a Make:", err)); 
+      }
 
       setSelectedTicket((prev) =>
         prev
@@ -210,7 +227,7 @@ const canAdminReassignSelected = isAdmin && !!selectedTicket;
 
       setIsReplying(false);
       setReplyText("");
-      toast.success("Respuesta enviada");
+      toast.success("Respuesta enviada y notificada al cliente");
     } catch (e: any) {
       toast.error(e?.message ?? "No se pudo guardar la respuesta");
     } finally {
