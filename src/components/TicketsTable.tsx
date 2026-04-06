@@ -722,7 +722,7 @@ const handleReassign = () => {
                   </div>
                 </div>
 
-                {/* BARRA LATERAL (Derecha) */}
+              {/* BARRA LATERAL (Derecha) */}
                 <div className="space-y-6">
                   
                   {/* Tarjeta: Estado y Prioridad */}
@@ -740,11 +740,12 @@ const handleReassign = () => {
                                 {ESTADOS.map((e) => <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={handleConfirmStateChange} disabled={!newEstado || newEstado === selectedTicket.estado || savingState} className="flex-1 bg-indigo-600 text-white border-0 hover:bg-indigo-700">
+                            {/* MODIFICADO: Grilla de 2 columnas estricta */}
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <Button size="sm" onClick={handleConfirmStateChange} disabled={!newEstado || newEstado === selectedTicket.estado || savingState} className="bg-indigo-600 text-white border-0 hover:bg-indigo-700 w-full">
                                 Confirmar
                               </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelStateChange} disabled={savingState} className="flex-1">
+                              <Button size="sm" variant="outline" onClick={handleCancelStateChange} disabled={savingState} className="w-full bg-white">
                                 Cancelar
                               </Button>
                             </div>
@@ -792,11 +793,12 @@ const handleReassign = () => {
                             ))}
                           </SelectContent>
                         </Select>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={handleConfirmReassign} disabled={!newAssignedTo || savingReassign} className="flex-1 bg-indigo-600 text-white border-0 hover:bg-indigo-700">
+                        {/* MODIFICADO: Grilla de 2 columnas estricta */}
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <Button size="sm" onClick={handleConfirmReassign} disabled={!newAssignedTo || savingReassign} className="bg-indigo-600 text-white border-0 hover:bg-indigo-700 w-full">
                             Confirmar
                           </Button>
-                          <Button size="sm" variant="outline" onClick={handleCancelReassign} disabled={savingReassign} className="flex-1">
+                          <Button size="sm" variant="outline" onClick={handleCancelReassign} disabled={savingReassign} className="w-full bg-white">
                             Cancelar
                           </Button>
                         </div>
@@ -822,47 +824,45 @@ const handleReassign = () => {
                   </div>
 
                   {/* Tarjeta: Panel de Acciones Rapidas */}
-                  <div className="bg-slate-900 rounded-2xl shadow-lg p-6 text-white border border-slate-800">
-                    <h3 className="text-base font-bold mb-4 text-white flex items-center gap-2">
-                      <Bot className="w-5 h-5 text-indigo-400" />
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                      <Bot className="w-5 h-5 text-indigo-500" />
                       Acciones Rápidas
                     </h3>
-                    
-                    {!isAdmin && selectedTicket && !isAssignedToMeSelected && (
-                      <div className="text-xs text-slate-300 mb-5 bg-slate-800 p-3 rounded-xl border border-slate-700">
-                        {isUnassignedSelected
-                          ? "Este ticket está libre. Podés autoasignártelo para empezar a trabajarlo."
-                          : "Solo el técnico asignado puede responder o cambiar el estado."}
-                      </div>
-                    )}
 
-                    {isAdmin && (
-                      <div className="text-[13px] text-slate-300 mb-5 bg-slate-800 p-3.5 rounded-xl border border-slate-700 leading-relaxed">
-                        Como administrador gestionás la asignación de carga de trabajo, pero no podés responder tickets directamente.
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      {!isAdmin && (
-                        <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 font-semibold h-11" onClick={handleAutoAssign} disabled={!canTechAutoAssignSelected || savingAutoAssign}>
-                          {savingAutoAssign ? "Asignando..." : "Autoasignarme este ticket"}
-                        </Button>
-                      )}
-
-                      <Button className="w-full bg-indigo-600 hover:bg-indigo-500 border-0 text-white font-semibold h-11 transition-colors" onClick={handleReply} disabled={isAdmin || !canTechWorkSelected}>
-                        Responder al Cliente
-                      </Button>
-
-                      <Button className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold h-11 transition-colors" onClick={handleChangeState} disabled={isAdmin || !canTechWorkSelected}>
-                        Cambiar Estado
-                      </Button>
-
-                      {isAdmin && (
-                        <Button className="w-full bg-white text-slate-900 hover:bg-slate-200 font-semibold h-11 mt-2" onClick={handleReassign} disabled={!canAdminReassignSelected}>
+                    {/* MODIFICADO: Lógica condicional limpia para Admin vs Técnico */}
+                    {isAdmin ? (
+                      <div className="space-y-4">
+                        <div className="bg-indigo-50 text-indigo-800 text-[13px] p-4 rounded-xl border border-indigo-100 leading-relaxed">
+                          <strong>Modo Administrador:</strong> Tenés control para reasignar la carga de trabajo, pero la gestión directa del ticket corresponde al técnico.
+                        </div>
+                        <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold h-11 transition-colors" onClick={handleReassign} disabled={!canAdminReassignSelected}>
                           {isReassigning ? "Cargando..." : "Reasignar Técnico"}
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {!isAssignedToMeSelected && (
+                          <div className="text-[13px] text-slate-600 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-200 leading-relaxed">
+                            {isUnassignedSelected
+                              ? "Este ticket está libre. Podés autoasignártelo para empezar a trabajarlo."
+                              : "Solo el técnico asignado puede responder o cambiar el estado."}
+                          </div>
+                        )}
+
+                        <Button className="w-full bg-slate-100 text-slate-900 hover:bg-slate-200 font-semibold h-11 border border-slate-200 transition-colors" onClick={handleAutoAssign} disabled={!canTechAutoAssignSelected || savingAutoAssign}>
+                          {savingAutoAssign ? "Asignando..." : "Autoasignarme este ticket"}
+                        </Button>
+
+                        <Button className="w-full bg-indigo-600 hover:bg-indigo-700 border-0 text-white font-semibold h-11 transition-colors" onClick={handleReply} disabled={!canTechWorkSelected}>
+                          Responder al Cliente
+                        </Button>
+
+                        <Button className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold h-11 transition-colors" onClick={handleChangeState} disabled={!canTechWorkSelected}>
+                          Cambiar Estado
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                 </div>

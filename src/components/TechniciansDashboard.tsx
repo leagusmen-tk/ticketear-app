@@ -116,7 +116,6 @@ export function TechniciansDashboard({
             <CardDescription>Distribución de tickets según su estado</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow pt-0">
-            {/* Reducimos un poquito la altura (height: 300) para compactar el dashboard general */}
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -124,7 +123,13 @@ export function TechniciansDashboard({
                   margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{fill: '#64748b'}} tickLine={false} axisLine={false} />
+              <XAxis 
+  dataKey="name" 
+  interval={0} 
+  tick={{ fill: '#64748b', fontSize: 12 }} 
+  tickLine={false} 
+  axisLine={false} 
+/>
                   <YAxis allowDecimals={false} tick={{fill: '#64748b'}} tickLine={false} axisLine={false} />
                   <Tooltip 
                     cursor={{fill: '#f1f5f9'}} 
