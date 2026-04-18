@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "c:/Users/leagu/OneDrive/Escritorio/Ticketear/src/services/supabaseClient";
+import { supabase } from "./src/services/supabaseClient";
 import { toast } from "sonner";
 import { Bot, Loader2 } from "lucide-react";
 
