@@ -3,6 +3,22 @@ import { supabase } from "../services/supabaseClient";
 
 type Mode = "signin" | "signup";
 
+function traducirErrorSupabase(mensajeError: string): string {
+  const errorLimpio = mensajeError.toLowerCase();
+
+  if (errorLimpio.includes("invalid login credentials")) {
+    return "Correo o contraseña incorrectos. Revisá tus datos.";
+  }
+  if (errorLimpio.includes("user already registered")) {
+    return "Este correo ya se encuentra registrado en el sistema.";
+  }
+  if (errorLimpio.includes("password should be at least")) {
+    return "La contraseña es muy débil. Debe tener al menos 6 caracteres.";
+  }
+  
+  return "Ocurrió un error inesperado. Contactá al soporte.";
+}
+
 export function Login() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -15,11 +31,13 @@ export function Login() {
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    setLoading(false);
-    if (error) setError(error.message);
-  };
+  setLoading(false);
+  if (error) {
+    setError(traducirErrorSupabase(error.message));
+  }
+};
 
   const handleSignUp = async () => {
     setError(null);
@@ -41,7 +59,8 @@ export function Login() {
 
     if (error) {
       setLoading(false);
-      setError(error.message);
+      // ACÁ ESTÁ EL CAMBIO:
+      setError(traducirErrorSupabase(error.message));
       return;
     }
 
