@@ -12,6 +12,7 @@ import { Calendar, User, MessageSquare, Send, X, Loader2, Bot } from "lucide-rea
 
 
 import { CreateTicket } from "./CreateTicket";
+import { SmartTextarea } from "./SmartTextarea";
 import type { Ticket, Estado } from "../types/ticket";
 import { ESTADOS, ESTADO_LABELS } from "../data/tickets";
 
@@ -503,7 +504,7 @@ const handleReassign = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 rounded-xl border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 rounded-xl border-slate-300 px-3 py-2.5 caret-slate-900 focus:ring-2 focus:ring-indigo-500 [color-scheme:light]"
             />
 
             <div className="flex flex-col sm:flex-row gap-2">
@@ -718,11 +719,10 @@ const handleReassign = () => {
                     {isReplying && (
                       <div className="border-t border-slate-100 pt-5 mt-2 animate-in fade-in slide-in-from-top-2">
                         <label className="text-sm font-bold text-slate-700 mb-2 block">Escribir respuesta:</label>
-                        <Textarea
+                        <SmartTextarea
                           value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
+                          onChange={setReplyText}
                           placeholder="Ingresá los detalles de la resolución o el mensaje para el cliente..."
-                          className="min-h-[120px] resize-none focus:ring-2 focus:ring-indigo-500 rounded-xl bg-white border-slate-200 text-slate-800"
                           disabled={savingReply}
                         />
                         <div className="flex gap-3 justify-end mt-4">
