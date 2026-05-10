@@ -39,6 +39,33 @@ const { error } = await supabase.auth.signInWithPassword({ email, password });
   }
 };
 
+const handleRecuperarPassword = async () => {
+    // 1. Verificamos que el usuario haya escrito su mail antes de hacer clic
+    if (!email) {
+      setError("Por favor, escribí tu correo arriba para enviarte el enlace de recuperación.");
+      return;
+    }
+
+    setLoading(true);
+    // 2. Le pedimos a Supabase que mande el correo mágico
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Como no tenés router, lo mandamos simplemente a la raíz de tu proyecto
+      redirectTo: window.location.origin, 
+    });
+    setLoading(false);
+
+    // 3. Manejamos la respuesta
+    if (error) {
+      setError(traducirErrorSupabase(error.message)); // Reutilizamos tu traductor
+    } else {
+      // Borramos cualquier error previo y le avisamos que revise la casilla
+      setError("");
+      alert("¡Revisá tu casilla! Te enviamos un enlace para recuperar tu contraseña."); 
+      // Nota: Si tenés importado 'toast' de Sonner en este archivo, podés cambiar el alert por:
+      // toast.success("¡Revisá tu casilla! Te enviamos un enlace.");
+    }
+  };
+
   const handleSignUp = async () => {
     setError(null);
 
@@ -108,6 +135,16 @@ const { error } = await supabase.auth.signInWithPassword({ email, password });
           >
             Iniciar sesión
           </button>
+          <div className="flex justify-end mt-1 mb-4">
+  <button
+    type="button"
+    onClick={handleRecuperarPassword}
+    disabled={loading}
+    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors bg-transparent border-none cursor-pointer"
+  >
+    ¿Olvidaste tu contraseña?
+  </button>
+</div>
           <button
             type="button"
             onClick={() => setMode("signup")}
