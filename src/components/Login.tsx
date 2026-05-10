@@ -71,25 +71,7 @@ const { error } = await supabase.auth.signInWithPassword({ email, password });
       return;
     }
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .upsert(
-        {
-          id: userId,
-          email,
-          full_name: fullName.trim(),
-          role: "technician",
-        },
-        { onConflict: "id" }
-      );
-
     setLoading(false);
-
-    if (profileError) {
-      console.error("profiles upsert error:", profileError);
-      setError("Usuario creado, pero no pude guardar el perfil. Revisá policies/RLS.");
-      return;
-    }
 
     setError("Usuario creado. Ahora iniciá sesión.");
     setMode("signin");

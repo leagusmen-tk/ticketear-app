@@ -6,6 +6,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { SmartTextarea } from "./SmartTextarea";
 
 import type { Ticket } from "../types/ticket";
 
@@ -172,18 +173,21 @@ export function CreateTicket({
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
                 disabled={submitting}
+                className="bg-white border-slate-200 text-slate-800 caret-slate-900 focus:ring-2 focus:ring-indigo-500 rounded-xl [color-scheme:light]"
               />
               <Input
                 placeholder="Email *"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={submitting}
+                className="bg-white border-slate-200 text-slate-800 caret-slate-900 focus:ring-2 focus:ring-indigo-500 rounded-xl [color-scheme:light]"
               />
               <Input
                 placeholder="Teléfono"
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 disabled={submitting}
+                className="bg-white border-slate-200 text-slate-800 caret-slate-900 focus:ring-2 focus:ring-indigo-500 rounded-xl [color-scheme:light]"
               />
 
               <Select
@@ -207,13 +211,13 @@ export function CreateTicket({
               value={asunto}
               onChange={(e) => setAsunto(e.target.value)}
               disabled={submitting}
+              className="bg-white border-slate-200 text-slate-800 caret-slate-900 focus:ring-2 focus:ring-indigo-500 rounded-xl [color-scheme:light]"
             />
 
-            <Textarea
+            <SmartTextarea
               placeholder="Descripción *"
               value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              className="min-h-[120px]"
+              onChange={setDescripcion}
               disabled={submitting}
             />
 
