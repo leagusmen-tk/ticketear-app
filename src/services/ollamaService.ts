@@ -49,6 +49,8 @@ export const ollamaService = {
 
       for await (const part of response) {
         onChunk(part.message.content);
+        // Forzamos al navegador a procesar animaciones (evita que el spinner se congele)
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
     } catch (error) {
       console.error("Error en streaming con Ollama:", error);

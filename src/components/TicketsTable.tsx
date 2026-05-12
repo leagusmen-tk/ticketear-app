@@ -12,8 +12,22 @@ import { Calendar, User, MessageSquare, Send, X, Loader2, Bot } from "lucide-rea
 
 
 import { CreateTicket } from "./CreateTicket";
+import { SmartTextarea } from "./SmartTextarea";
 import type { Ticket, Estado } from "../types/ticket";
 import { ESTADOS, ESTADO_LABELS } from "../data/tickets";
+
+const esTicketNuevo = (fechaCreacion: string | Date | any, estado: string | any) => {
+  if (!fechaCreacion) return false;
+  if (estado !== "Abierto") return false;
+
+  // Forzamos la conversión a Date por si viene en otro formato
+  const fechaDelTicket = new Date(fechaCreacion).getTime();
+  const fechaActual = new Date().getTime();
+  
+  const diferenciaEnHoras = (fechaActual - fechaDelTicket) / (1000 * 60 * 60);
+
+  return diferenciaEnHoras < 12;
+};
 
 type TechnicianOption = { id: string; label: string };
 
@@ -484,7 +498,9 @@ const handleReassign = () => {
     );
   };
 
-  return (
+  
+
+ return (
     <div className="space-y-4">
       {/* Search and Filters */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -503,7 +519,7 @@ const handleReassign = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 rounded-xl border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 rounded-xl border-slate-300 px-3 py-2.5 caret-slate-900 focus:ring-2 focus:ring-indigo-500 [color-scheme:light]"
             />
 
             <div className="flex flex-col sm:flex-row gap-2">
@@ -596,7 +612,20 @@ const handleReassign = () => {
                 <TableRow key={ticket.id} className="hover:bg-slate-50">
                   <TableCell className="px-4 sm:px-6 py-4 text-slate-900 whitespace-nowrap">{ticket.id}</TableCell>
                   <TableCell className="px-4 sm:px-6 py-4 whitespace-nowrap">{ticket.cliente}</TableCell>
-                  <TableCell className="px-4 sm:px-6 py-4 max-w-xs truncate">{ticket.asunto}</TableCell>
+                  
+                  {/* ACÁ ESTÁ EL CAMBIO DE LA ETIQUETA NUEVO */}
+                  <TableCell className="px-4 sm:px-6 py-4 max-w-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate block">{ticket.asunto}</span>
+                 {esTicketNuevo(ticket.fechaCreacion, ticket.estado) && (
+  <span className="inline-flex items-center justify-center gap-1.5 px-3 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium shrink-0">
+    <span className="block w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+    Nuevo
+  </span>
+)}
+                    </div>
+                  </TableCell>
+
                   <TableCell className="px-4 sm:px-6 py-4 whitespace-nowrap">{getEstadoBadge(ticket.estado)}</TableCell>
 
                   <TableCell className="px-4 sm:px-6 py-4 whitespace-nowrap text-slate-600">
@@ -612,7 +641,7 @@ const handleReassign = () => {
                   </TableCell>
 
                   <TableCell className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                    <button onClick={() => handleViewTicket(ticket)} className="text-indigo-600 hover:text-indigo-800">
+                    <button onClick={() => handleViewTicket(ticket)} className="text-indigo-600 hover:text-indigo-800 font-medium">
                       Ver
                     </button>
                   </TableCell>
@@ -627,7 +656,7 @@ const handleReassign = () => {
         </div>
       </section>
 
-{/* Modal */}
+      {/* Modal */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[1000px] w-[95vw] max-h-[90vh] overflow-y-auto bg-slate-50 p-4 sm:p-8 border-slate-200 shadow-2xl rounded-2xl">
           {selectedTicket && (
@@ -718,11 +747,10 @@ const handleReassign = () => {
                     {isReplying && (
                       <div className="border-t border-slate-100 pt-5 mt-2 animate-in fade-in slide-in-from-top-2">
                         <label className="text-sm font-bold text-slate-700 mb-2 block">Escribir respuesta:</label>
-                        <Textarea
+                        <SmartTextarea
                           value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
+                          onChange={setReplyText}
                           placeholder="Ingresá los detalles de la resolución o el mensaje para el cliente..."
-                          className="min-h-[120px] resize-none focus:ring-2 focus:ring-indigo-500 rounded-xl bg-white border-slate-200 text-slate-800"
                           disabled={savingReply}
                         />
                         <div className="flex gap-3 justify-end mt-4">
@@ -757,7 +785,6 @@ const handleReassign = () => {
                                 {ESTADOS.map((e) => <SelectItem key={e} value={e}>{ESTADO_LABELS[e]}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            {/* MODIFICADO: Grilla de 2 columnas estricta */}
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               <Button size="sm" onClick={handleConfirmStateChange} disabled={!newEstado || newEstado === selectedTicket.estado || savingState} className="bg-indigo-600 text-white border-0 hover:bg-indigo-700 w-full">
                                 Confirmar
@@ -810,7 +837,6 @@ const handleReassign = () => {
                             ))}
                           </SelectContent>
                         </Select>
-                        {/* MODIFICADO: Grilla de 2 columnas estricta */}
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <Button size="sm" onClick={handleConfirmReassign} disabled={!newAssignedTo || savingReassign} className="bg-indigo-600 text-white border-0 hover:bg-indigo-700 w-full">
                             Confirmar
@@ -847,7 +873,6 @@ const handleReassign = () => {
                       Acciones Rápidas
                     </h3>
 
-                    {/* MODIFICADO: Lógica condicional limpia para Admin vs Técnico */}
                     {isAdmin ? (
                       <div className="space-y-4">
                         <div className="bg-indigo-50 text-indigo-800 text-[13px] p-4 rounded-xl border border-indigo-100 leading-relaxed">
