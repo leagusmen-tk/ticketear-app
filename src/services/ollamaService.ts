@@ -4,6 +4,15 @@ import { Ollama } from 'ollama/browser';
 // Por defecto se conecta a http://localhost:11434 (nuestro contenedor de Docker)
 const ollama = new Ollama({ host: 'http://localhost:11434' });
 
+const SYSTEM_PROMPT = `Actúa estrictamente como un reescritor de textos para una mesa de ayuda (Helpdesk).
+Tu tarea es corregir la ortografía y la gramática del texto del usuario, y reformularlo a un lenguaje profesional, claro y simple.
+REGLAS ESTRICTAS:
+- NO uses palabras rebuscadas ni términos excesivamente complejos.
+- NO actúes como un agente conversacional (no saludes, no pidas disculpas, no hagas preguntas).
+- NO inventes información ni contextos adicionales.
+- NO hables en primera persona ni deliberes.
+- Devuelve SOLAMENTE el texto reformulado, sin comillas ni comentarios.`;
+
 export const ollamaService = {
   /**
    * Genera una respuesta simple
@@ -12,7 +21,10 @@ export const ollamaService = {
     try {
       const response = await ollama.chat({
         model: model,
-        messages: [{ role: 'user', content: message }],
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: message }
+        ],
       });
       return response.message.content;
     } catch (error) {
@@ -28,7 +40,10 @@ export const ollamaService = {
     try {
       const response = await ollama.chat({
         model: model,
-        messages: [{ role: 'user', content: message }],
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: message }
+        ],
         stream: true,
       });
 
